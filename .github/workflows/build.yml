@@ -1,0 +1,29 @@
+name: Build Gamemode
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Compile Gamemode
+        shell: cmd
+        run: |
+          qawno\pawncc.exe ^
+            gamemodes\main.pwn ^
+            -iqawno\include ^
+            -ogamemodes\main.amx
+
+      - name: Upload AMX
+        uses: actions/upload-artifact@v4
+        with:
+          name: gamemode
+          path: gamemodes/main.amx
