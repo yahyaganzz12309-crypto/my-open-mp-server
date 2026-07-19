@@ -25,7 +25,7 @@ jobs:
         run: |
           echo "Mengaktifkan izin jalan untuk file Linux..."
           # Memastikan file open.mp dan compiler pawncc bawaan repo kamu bisa dieksekusi oleh sistem Linux
-          chmod +x open.mp
+          chmod +x 
           if [ -d "qawno" ]; then chmod +x qawno/pawncc 2>/dev/null || true; fi
 
       - name: Jalankan Terowongan Publik & Server
@@ -48,4 +48,4 @@ jobs:
           echo "=================================================="
           
           # Langsung jalankan file open.mp yang ada di repo kamu
-          ./open.mp
+          ./omp-server
