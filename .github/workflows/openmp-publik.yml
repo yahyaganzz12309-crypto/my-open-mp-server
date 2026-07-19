@@ -1,4 +1,4 @@
-name: Open.mp Windows Public Debug
+name: Open.mp Windows Public Final
 
 on:
   workflow_dispatch: 
@@ -19,18 +19,28 @@ jobs:
           
           Write-Host "Mengekstrak file Ngrok..."
           Expand-Archive -Path "ngrok.zip" -DestinationPath "."
-          
-          Write-Host "Memasang Authtoken..."
-          ./ngrok.exe config add-authtoken ${{ secrets.NGROK_AUTHTOKEN }}
         shell: powershell
 
       - name: Jalankan Terowongan Publik & Server
         run: |
-          Write-Host "Membuka terowongan publik Ngrok (UDP Port 7777)..."
-          # Perbaikan: Ngrok dijalankan dengan melempar output log ke file ngrok.log agar bisa diintip
-          Start-Process ./ngrok.exe -ArgumentList "udp 7777" -RedirectStandardOutput "ngrok.log" -RedirectStandardError "ngrok_err.log" -NoNewWindow
+          Write-Host "Membuat file konfigurasi khusus UDP..."
+          # Membuat file ngrok.yml secara otomatis untuk mendaftarkan jalur UDP port 7777
+          $configContent = @"
+          version: "3"
+          agent:
+            authtoken: ${{ secrets.NGROK_AUTHTOKEN }}
+          tunnels:
+            samp:
+              proto: udp
+              addr: 7777
+          "@
+          $configContent | Out-File -FilePath "ngrok-config.yml" -Encoding ascii
+
+          Write-Host "Membuka terowongan publik Ngrok via Config..."
+          # Menjalankan ngrok dengan memanggil tunnel bernama 'samp' yang sudah dibuat di atas
+          Start-Process ./ngrok.exe -ArgumentList "start samp --config ngrok-config.yml" -RedirectStandardOutput "ngrok.log" -RedirectStandardError "ngrok_err.log" -NoNewWindow
           
-          # Tunggu hingga 15 detik sambil ngecek API Ngrok
+          # Tunggu hingga 15 detik sampai Ngrok berhasil memetakan IP publik
           $ip = $null
           for ($i = 1; $i -le 15; $i++) {
               Start-Sleep -Seconds 1
@@ -42,7 +52,7 @@ jobs:
                       break
                   }
               } catch {
-                  # Abaikan eror jika API belum siap merespons
+                  # Abaikan eror sementara menunggu API Ngrok siap
               }
           }
           
@@ -63,6 +73,6 @@ jobs:
               Write-Host "=================================================="
           }
           
-          # Jalankan server utama open.mp
+          # Langsung jalankan server utama open.mp Windows kamu
           .\omp-server.exe
         shell: powershell
