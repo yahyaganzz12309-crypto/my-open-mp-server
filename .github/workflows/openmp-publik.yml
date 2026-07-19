@@ -1,4 +1,4 @@
-name: Open.mp Windows Playit Manual
+name: Open.mp Windows Playit Auto-Find
 
 on:
   workflow_dispatch: 
@@ -14,18 +14,30 @@ jobs:
 
       - name: Jalankan Terowongan & Server
         run: |
-          Write-Host "Menjalankan Playit.gg langsung dari Repositori..."
-          # Langsung mengeksekusi playit.exe yang sudah kamu upload
-          Start-Process ./playit.exe -RedirectStandardOutput "playit.log" -NoNewWindow
+          Write-Host "Mencari file playit.exe secara otomatis di seluruh folder..."
+          # Mencari file yang mengandung kata playit dan berakhiran .exe
+          $playitFile = Get-ChildItem -Recurse -Filter "*playit*.exe" | Select-Object -First 1
           
-          # Jeda 10 detik agar Playit memunculkan link klaim
-          Start-Sleep -Seconds 10
-          
-          Write-Host "=================================================="
-          Write-Host "   BACA LOG DI BAWAH INI UNTUK AKTIVASI SERVER"
-          Write-Host "=================================================="
-          if (Test-Path "playit.log") { Get-Content "playit.log" }
-          Write-Host "=================================================="
+          if ($playitFile) {
+              Write-Host "✅ File ketemu di: $($playitFile.FullName)"
+              Write-Host "Menjalankan Playit.gg di latar belakang..."
+              Start-Process $playitFile.FullName -RedirectStandardOutput "playit.log" -NoNewWindow
+              
+              # Jeda 10 detik biar link klaimnya kebuat
+              Start-Sleep -Seconds 10
+              
+              Write-Host "=================================================="
+              Write-Host "   BACA LOG DI BAWAH INI UNTUK AKTIVASI SERVER"
+              Write-Host "=================================================="
+              if (Test-Path "playit.log") { Get-Content "playit.log" }
+              Write-Host "=================================================="
+          } else {
+              Write-Host "=================================================="
+              Write-Host "❌ WADUH! File playit.exe beneran GAK ADA di repo kamu."
+              Write-Host "Coba cek lagi di Codespaces, apakah udah di-commit & push?"
+              Write-Host "=================================================="
+              exit 1
+          }
           
           Write-Host "Menyalakan server utama open.mp..."
           .\omp-server.exe
