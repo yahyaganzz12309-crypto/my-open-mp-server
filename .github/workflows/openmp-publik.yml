@@ -1,48 +1,78 @@
-name: Open.mp Linux Playit Official
+name: Open.mp Windows Playit Auto-Find
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch:
 
 jobs:
   run-server:
-    runs-on: ubuntu-latest
-    timeout-minutes: 350 
+    runs-on: windows-latest
+    timeout-minutes: 350
 
     steps:
-      - name: Ambil file dari Repositori
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Dependencies 32-bit (Anti Eror Libatomic)
+      - name: Jalankan Playit & Open.mp
+        shell: powershell
         run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install -y libatomic1:i386 libc6:i386 libstdc++6:i386 wget
+          Write-Host "========================================"
+          Write-Host " Mencari playit.exe..."
+          Write-Host "========================================"
 
-      - name: Download Playit.gg Linux Resmi
-        run: |
-          echo "Mengunduh Playit.gg versi Linux via wget..."
-          wget -O playit https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-amd64
-          chmod +x playit
+          $playit = Get-ChildItem -Path $PWD -Recurse -Filter "*playit*.exe" | Select-Object -First 1
 
-      - name: Beri Izin Eksekusi Server (Chmod)
-        run: |
-          chmod +x omp-server
-          if [ -d "qawno" ]; then chmod +x qawno/pawncc 2>/dev/null || true; fi
+          if (-not $playit) {
+              Write-Host "❌ playit.exe tidak ditemukan!"
+              exit 1
+          }
 
-      - name: Jalankan Terowongan & Server
-        run: |
-          echo "Menjalankan Playit.gg dengan hak akses sudo..."
-          # Ditambahkan sudo di depan agar tidak eror socket/IPC
-          sudo ./playit > playit.log 2>&1 &
-          
-          sleep 10
-          
-          echo "=================================================="
-          echo "   BACA LOG DI BAWAH INI UNTUK AKTIVASI SERVER"
-          echo "=================================================="
-          if [ -f "playit.log" ]; then cat playit.log; fi
-          echo "=================================================="
-          
-          echo "Menyalakan server utama open.mp Linux..."
-          export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
-          ./omp-server
+          Write-Host "✅ playit ditemukan:"
+          Write-Host $playit.FullName
+
+          $playitLog = Join-Path $PWD "playit.log"
+          $playitErr = Join-Path $PWD "playit-error.log"
+
+          Start-Process `
+            -FilePath $playit.FullName `
+            -RedirectStandardOutput $playitLog `
+            -RedirectStandardError $playitErr
+
+          Write-Host "Menunggu Playit membuat link..."
+          Start-Sleep -Seconds 15
+
+          Write-Host ""
+          Write-Host "========== PLAYIT LOG =========="
+
+          if (Test-Path $playitLog) {
+              Get-Content $playitLog
+          } else {
+              Write-Host "playit.log belum dibuat."
+          }
+
+          if (Test-Path $playitErr) {
+              Write-Host ""
+              Write-Host "========== PLAYIT ERROR =========="
+              Get-Content $playitErr
+          }
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host " Mencari omp-server.exe..."
+          Write-Host "========================================"
+
+          $omp = Get-ChildItem -Path $PWD -Recurse -Filter "omp-server.exe" | Select-Object -First 1
+
+          if (-not $omp) {
+              Write-Host "❌ omp-server.exe tidak ditemukan!"
+              exit 1
+          }
+
+          Write-Host "✅ omp-server ditemukan:"
+          Write-Host $omp.FullName
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host " Menjalankan Open.mp Server"
+          Write-Host "========================================"
+
+          & $omp.FullName
