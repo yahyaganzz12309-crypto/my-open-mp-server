@@ -1,54 +1,61 @@
-name: Open.mp Publik Final Fixed
+name: Open.mp Windows Public (Ngrok)
 
 on:
   workflow_dispatch: 
 
 jobs:
   run-server:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest # Menggunakan Windows Server dari GitHub
     timeout-minutes: 350 
 
     steps:
       - name: Ambil file dari Repositori
         uses: actions/checkout@v4
 
-      - name: Install Ngrok & Dependencies Linux (32-bit + 64-bit)
+      - name: Install Ngrok
         run: |
-          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-          
-          # 1. Wajib aktifkan arsitektur i386 (32-bit) di sistem Ubuntu GitHub
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          
-          # 2. Install ngrok, jq, serta library pendukung versi 32-bit (:i386)
-          sudo apt-get install -y ngrok jq libatomic1 libatomic1:i386 libc6:i386 libstdc++6:i386
+          choco install ngrok -y
+        shell: powershell
 
       - name: Konfigurasi Ngrok Authtoken
-        run: ngrok config add-authtoken ${{ secrets.NGROK_AUTHTOKEN }}
-
-      - name: Beri Izin Eksekusi Server (Chmod)
         run: |
-          chmod +x omp-server
-          if [ -d "qawno" ]; then chmod +x qawno/pawncc 2>/dev/null || true; fi
+          ngrok config add-authtoken ${{ secrets.NGROK_AUTHTOKEN }}
+        shell: powershell
+
+      - name: Matikan Windows Defender (Biar Ringan & Bebas Lag)
+        run: |
+          # Mematikan realtime scan agar Windows Defender tidak memakan RAM/CPU server game kamu
+          Set-MpPreference -DisableRealtimeMonitoring $true
+        shell: powershell
 
       - name: Jalankan Terowongan Publik & Server
         run: |
-          echo "Membuka terowongan publik Ngrok..."
-          ngrok udp 7777 > ngrok.log 2>&1 &
+          Write-Host "Membuka terowongan publik Ngrok (UDP Port 7777)..."
+          # Menjalankan ngrok di latar belakang secara tersembunyi
+          Start-Process ngrok -ArgumentList "udp 7777" -WindowStyle Hidden
           
-          sleep 5
+          # Menunggu 5 detik agar Ngrok mendapatkan IP
+          Start-Sleep -Seconds 5
           
-          echo "=================================================="
-          echo " STATUS: SERVER OPEN.MP PUBLIK ONLINE!"
-          echo "=================================================="
-          echo "Salin alamat di bawah ini ke Launcher SAMP kamu:"
+          # Mengambil otomatis IP publik dari API Ngrok via PowerShell
+          try {
+              $ngrokApi = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels"
+              $publicUrl = $ngrokApi.tunnels[0].public_url
+              $ip = $publicUrl -replace 'udp://', ''
+              
+              Write-Host "=================================================="
+              Write-Host " STATUS: SERVER OPEN.MP WINDOWS ONLINE!"
+              Write-Host "=================================================="
+              Write-Host "Salin alamat di bawah ini ke Launcher SAMP kamu & teman-teman:"
+              Write-Host "👉 $ip"
+              Write-Host "=================================================="
+          } catch {
+              Write-Host "=================================================="
+              Write-Host "❌ Gagal mendapatkan IP otomatis di log."
+              Write-Host "Tapi server tetap jalan! Silakan cek IP di dashboard.ngrok.com"
+              Write-Host "=================================================="
+          }
           
-          PUBLIC_IP=$(curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url' | sed 's/udp:\/\///')
-          echo "👉 $PUBLIC_IP"
-          
-          echo "=================================================="
-          
-          # Mengarahkan folder library lokal agar server mendeteksi file 32-bit dengan mulus
-          export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
-          ./omp-server
+          # Langsung jalankan file omp-server.exe bawaan repo kamu
+          .\omp-server.exe
+        shell: powershell
