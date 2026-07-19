@@ -1,4 +1,4 @@
-name: Open.mp Windows Public Final
+name: Open.mp Windows Public (Playit.gg)
 
 on:
   workflow_dispatch: 
@@ -12,67 +12,29 @@ jobs:
       - name: Ambil file dari Repositori
         uses: actions/checkout@v4
 
-      - name: Download & Setup Ngrok Direct
+      - name: Download Playit.gg Agent
         run: |
-          Write-Host "Mengunduh Ngrok versi Windows..."
-          Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip" -OutFile "ngrok.zip"
-          
-          Write-Host "Mengekstrak file Ngrok..."
-          Expand-Archive -Path "ngrok.zip" -DestinationPath "."
+          Write-Host "Mengunduh Playit.gg untuk Windows..."
+          # Mengunduh langsung file CLI portable resmi dari Playit.gg
+          Invoke-WebRequest -Uri "https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-windows-amd64.exe" -OutFile "playit.exe"
         shell: powershell
 
-      - name: Jalankan Terowongan Publik & Server
+      - name: Jalankan Terowongan & Server
         run: |
-          Write-Host "Membuat file konfigurasi khusus UDP..."
-          # Membuat file ngrok.yml secara otomatis untuk mendaftarkan jalur UDP port 7777
-          $configContent = @"
-          version: "3"
-          agent:
-            authtoken: ${{ secrets.NGROK_AUTHTOKEN }}
-          tunnels:
-            samp:
-              proto: udp
-              addr: 7777
-          "@
-          $configContent | Out-File -FilePath "ngrok-config.yml" -Encoding ascii
-
-          Write-Host "Membuka terowongan publik Ngrok via Config..."
-          # Menjalankan ngrok dengan memanggil tunnel bernama 'samp' yang sudah dibuat di atas
-          Start-Process ./ngrok.exe -ArgumentList "start samp --config ngrok-config.yml" -RedirectStandardOutput "ngrok.log" -RedirectStandardError "ngrok_err.log" -NoNewWindow
+          Write-Host "Menjalankan Playit.gg di latar belakang..."
+          # Menjalankan playit di background dan merekam link aktivasi ke playit.log
+          Start-Process ./playit.exe -RedirectStandardOutput "playit.log" -NoNewWindow
           
-          # Tunggu hingga 15 detik sampai Ngrok berhasil memetakan IP publik
-          $ip = $null
-          for ($i = 1; $i -le 15; $i++) {
-              Start-Sleep -Seconds 1
-              try {
-                  $ngrokApi = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels"
-                  $publicUrl = $ngrokApi.tunnels[0].public_url
-                  if ($publicUrl) {
-                      $ip = $publicUrl -replace 'udp://', ''
-                      break
-                  }
-              } catch {
-                  # Abaikan eror sementara menunggu API Ngrok siap
-              }
-          }
+          # Tunggu 8 detik agar Playit selesai menyiapkan link klaim
+          Start-Sleep -Seconds 8
           
           Write-Host "=================================================="
-          Write-Host " STATUS: SERVER OPEN.MP WINDOWS ONLINE!"
+          Write-Host "   BACA LOG DI BAWAH INI UNTUK AKTIVASI SERVER"
+          Write-Host "=================================================="
+          if (Test-Path "playit.log") { Get-Content "playit.log" }
           Write-Host "=================================================="
           
-          if ($ip) {
-              Write-Host "Salin alamat di bawah ini ke Launcher SAMP kamu & teman-teman:"
-              Write-Host "👉 $ip"
-              Write-Host "=================================================="
-          } else {
-              Write-Host "❌ Ngrok Gagal Konek! Menampilkan log internal untuk debug:"
-              Write-Host "------------------ START LOG ------------------"
-              if (Test-Path "ngrok.log") { Get-Content "ngrok.log" }
-              if (Test-Path "ngrok_err.log") { Get-Content "ngrok_err.log" }
-              Write-Host "------------------- END LOG -------------------"
-              Write-Host "=================================================="
-          }
-          
-          # Langsung jalankan server utama open.mp Windows kamu
+          Write-Host "Menyalakan server utama open.mp..."
+          # Server open.mp kamu otomatis menyala di sini
           .\omp-server.exe
         shell: powershell
