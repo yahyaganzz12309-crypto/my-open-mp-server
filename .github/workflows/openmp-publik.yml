@@ -1,4 +1,4 @@
-name: Open.mp Publik Final
+name: Open.mp Publik Final Fixed
 
 on:
   workflow_dispatch: 
@@ -12,12 +12,17 @@ jobs:
       - name: Ambil file dari Repositori
         uses: actions/checkout@v4
 
-      - name: Install Ngrok & Dependencies Linux
+      - name: Install Ngrok & Dependencies Linux (32-bit + 64-bit)
         run: |
           curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
           echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          
+          # 1. Wajib aktifkan arsitektur i386 (32-bit) di sistem Ubuntu GitHub
+          sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y ngrok libatomic1 jq
+          
+          # 2. Install ngrok, jq, serta library pendukung versi 32-bit (:i386)
+          sudo apt-get install -y ngrok jq libatomic1 libatomic1:i386 libc6:i386 libstdc++6:i386
 
       - name: Konfigurasi Ngrok Authtoken
         run: ngrok config add-authtoken ${{ secrets.NGROK_AUTHTOKEN }}
@@ -44,4 +49,6 @@ jobs:
           
           echo "=================================================="
           
+          # Mengarahkan folder library lokal agar server mendeteksi file 32-bit dengan mulus
+          export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
           ./omp-server
