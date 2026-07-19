@@ -1,4 +1,4 @@
-name: Open.mp Windows Public (Playit.gg Fixed)
+name: Open.mp Windows Public (Playit.gg Real Fix)
 
 on:
   workflow_dispatch: 
@@ -14,18 +14,25 @@ jobs:
 
       - name: Download Playit.gg Agent
         run: |
-          Write-Host "Mengunduh Playit.gg menggunakan curl..."
-          # Menggunakan curl.exe bawaan Windows karena jauh lebih stabil dari Invoke-WebRequest
-          curl.exe -L -o playit.exe "https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-windows-amd64.exe"
+          Write-Host "Mengunduh Playit.gg menggunakan URL langsung resmi..."
+          # Menggunakan link bypass langsung dari server resmi playit.gg agar tidak tersesat 404
+          curl.exe -L -o playit.exe "https://playit.gg/downloads/playit-windows-amd64.exe"
         shell: powershell
 
       - name: Jalankan Terowongan & Server
         run: |
+          # Proteksi: Cek apakah file terunduh dengan benar (di atas 1 MB) atau cuma teks zonk
+          $file = Get-Item "playit.exe"
+          if ($file.Length -lt 100000) {
+              Write-Host "❌ File playit.exe rusak atau terkena internet positif/blokir!"
+              exit 1
+          }
+
           Write-Host "Menjalankan Playit.gg di latar belakang..."
           Start-Process ./playit.exe -RedirectStandardOutput "playit.log" -NoNewWindow
           
-          # Tunggu 8 detik agar Playit selesai menyiapkan link klaim
-          Start-Sleep -Seconds 8
+          # Jeda 10 detik agar sistem Playit membaca server kamu
+          Start-Sleep -Seconds 10
           
           Write-Host "=================================================="
           Write-Host "   BACA LOG DI BAWAH INI UNTUK AKTIVASI SERVER"
