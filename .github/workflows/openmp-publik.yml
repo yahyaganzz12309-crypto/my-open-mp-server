@@ -1,4 +1,4 @@
-name: Open.mp Windows Public (Playit.gg)
+name: Open.mp Windows Public (Playit.gg Fixed)
 
 on:
   workflow_dispatch: 
@@ -14,15 +14,14 @@ jobs:
 
       - name: Download Playit.gg Agent
         run: |
-          Write-Host "Mengunduh Playit.gg untuk Windows..."
-          # Mengunduh langsung file CLI portable resmi dari Playit.gg
-          Invoke-WebRequest -Uri "https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-windows-amd64.exe" -OutFile "playit.exe"
+          Write-Host "Mengunduh Playit.gg menggunakan curl..."
+          # Menggunakan curl.exe bawaan Windows karena jauh lebih stabil dari Invoke-WebRequest
+          curl.exe -L -o playit.exe "https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-windows-amd64.exe"
         shell: powershell
 
       - name: Jalankan Terowongan & Server
         run: |
           Write-Host "Menjalankan Playit.gg di latar belakang..."
-          # Menjalankan playit di background dan merekam link aktivasi ke playit.log
           Start-Process ./playit.exe -RedirectStandardOutput "playit.log" -NoNewWindow
           
           # Tunggu 8 detik agar Playit selesai menyiapkan link klaim
@@ -35,6 +34,5 @@ jobs:
           Write-Host "=================================================="
           
           Write-Host "Menyalakan server utama open.mp..."
-          # Server open.mp kamu otomatis menyala di sini
           .\omp-server.exe
         shell: powershell
