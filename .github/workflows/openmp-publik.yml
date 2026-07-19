@@ -14,7 +14,6 @@ jobs:
 
       - name: Install Dependencies 32-bit (Anti Eror Libatomic)
         run: |
-          # Mengaktifkan arsitektur 32-bit agar omp-server bisa jalan
           sudo dpkg --add-architecture i386
           sudo apt-get update
           sudo apt-get install -y libatomic1:i386 libc6:i386 libstdc++6:i386 wget
@@ -22,7 +21,6 @@ jobs:
       - name: Download Playit.gg Linux Resmi
         run: |
           echo "Mengunduh Playit.gg versi Linux via wget..."
-          # wget di Linux dijamin 100% sukses mendownload file asli sebesar 11MB
           wget -O playit https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-amd64
           chmod +x playit
 
@@ -33,10 +31,10 @@ jobs:
 
       - name: Jalankan Terowongan & Server
         run: |
-          echo "Menjalankan Playit.gg di latar belakang..."
-          ./playit > playit.log 2>&1 &
+          echo "Menjalankan Playit.gg dengan hak akses sudo..."
+          # Ditambahkan sudo di depan agar tidak eror socket/IPC
+          sudo ./playit > playit.log 2>&1 &
           
-          # Jeda 10 detik agar Playit selesai membuat link aktivasi
           sleep 10
           
           echo "=================================================="
