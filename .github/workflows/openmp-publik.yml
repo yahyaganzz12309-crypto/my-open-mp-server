@@ -1,61 +1,65 @@
-name: Open.mp Windows Public (Ngrok)
+name: Open.mp Windows Public Fixed
 
 on:
   workflow_dispatch: 
 
 jobs:
   run-server:
-    runs-on: windows-latest # Menggunakan Windows Server dari GitHub
+    runs-on: windows-latest
     timeout-minutes: 350 
 
     steps:
       - name: Ambil file dari Repositori
         uses: actions/checkout@v4
 
-      - name: Install Ngrok
+      - name: Download & Setup Ngrok Direct
         run: |
-          choco install ngrok -y
-        shell: powershell
-
-      - name: Konfigurasi Ngrok Authtoken
-        run: |
-          ngrok config add-authtoken ${{ secrets.NGROK_AUTHTOKEN }}
-        shell: powershell
-
-      - name: Matikan Windows Defender (Biar Ringan & Bebas Lag)
-        run: |
-          # Mematikan realtime scan agar Windows Defender tidak memakan RAM/CPU server game kamu
-          Set-MpPreference -DisableRealtimeMonitoring $true
+          Write-Host "Mengunduh Ngrok versi Windows..."
+          Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip" -OutFile "ngrok.zip"
+          
+          Write-Host "Mengekstrak file Ngrok..."
+          Expand-Archive -Path "ngrok.zip" -DestinationPath "."
+          
+          Write-Host "Memasang Authtoken..."
+          ./ngrok.exe config add-authtoken ${{ secrets.NGROK_AUTHTOKEN }}
         shell: powershell
 
       - name: Jalankan Terowongan Publik & Server
         run: |
           Write-Host "Membuka terowongan publik Ngrok (UDP Port 7777)..."
-          # Menjalankan ngrok di latar belakang secara tersembunyi
-          Start-Process ngrok -ArgumentList "udp 7777" -WindowStyle Hidden
+          # Jalankan ngrok lokal di latar belakang
+          Start-Process ./ngrok.exe -ArgumentList "udp 7777" -WindowStyle Hidden
           
-          # Menunggu 5 detik agar Ngrok mendapatkan IP
-          Start-Sleep -Seconds 5
-          
-          # Mengambil otomatis IP publik dari API Ngrok via PowerShell
-          try {
-              $ngrokApi = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels"
-              $publicUrl = $ngrokApi.tunnels[0].public_url
-              $ip = $publicUrl -replace 'udp://', ''
-              
-              Write-Host "=================================================="
-              Write-Host " STATUS: SERVER OPEN.MP WINDOWS ONLINE!"
-              Write-Host "=================================================="
-              Write-Host "Salin alamat di bawah ini ke Launcher SAMP kamu & teman-teman:"
-              Write-Host "👉 $ip"
-              Write-Host "=================================================="
-          } catch {
-              Write-Host "=================================================="
-              Write-Host "❌ Gagal mendapatkan IP otomatis di log."
-              Write-Host "Tapi server tetap jalan! Silakan cek IP di dashboard.ngrok.com"
-              Write-Host "=================================================="
+          # Sistem loop: Tunggu sampai Ngrok bener-bener dapet IP publik
+          $ip = $null
+          for ($i = 1; $i -le 15; $i++) {
+              try {
+                  $ngrokApi = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels"
+                  $publicUrl = $ngrokApi.tunnels[0].public_url
+                  if ($publicUrl) {
+                      $ip = $publicUrl -replace 'udp://', ''
+                      break
+                  }
+              } catch {
+                  # Tunggu sebentar lalu coba lagi
+              }
+              Start-Sleep -Seconds 1
           }
           
-          # Langsung jalankan file omp-server.exe bawaan repo kamu
+          Write-Host "=================================================="
+          Write-Host " STATUS: SERVER OPEN.MP WINDOWS ONLINE!"
+          Write-Host "=================================================="
+          Write-Host "Salin alamat di bawah ini ke Launcher SAMP kamu & teman-teman:"
+          
+          if ($ip) {
+              Write-Host "👉 $ip"
+          } else {
+              Write-Host "❌ Gagal mendapatkan IP otomatis di log."
+              Write-Host "Silakan cek di web dashboard.ngrok.com pada menu 'Endpoints'"
+          }
+          
+          Write-Host "=================================================="
+          
+          # Menyalakan server utama open.mp versi Windows
           .\omp-server.exe
         shell: powershell
