@@ -1,4 +1,4 @@
-name: Open.mp Windows Public Fixed
+name: Open.mp Windows Public Debug
 
 on:
   workflow_dispatch: 
@@ -27,12 +27,13 @@ jobs:
       - name: Jalankan Terowongan Publik & Server
         run: |
           Write-Host "Membuka terowongan publik Ngrok (UDP Port 7777)..."
-          # Jalankan ngrok lokal di latar belakang
-          Start-Process ./ngrok.exe -ArgumentList "udp 7777" -WindowStyle Hidden
+          # Perbaikan: Ngrok dijalankan dengan melempar output log ke file ngrok.log agar bisa diintip
+          Start-Process ./ngrok.exe -ArgumentList "udp 7777" -RedirectStandardOutput "ngrok.log" -RedirectStandardError "ngrok_err.log" -NoNewWindow
           
-          # Sistem loop: Tunggu sampai Ngrok bener-bener dapet IP publik
+          # Tunggu hingga 15 detik sambil ngecek API Ngrok
           $ip = $null
           for ($i = 1; $i -le 15; $i++) {
+              Start-Sleep -Seconds 1
               try {
                   $ngrokApi = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels"
                   $publicUrl = $ngrokApi.tunnels[0].public_url
@@ -41,25 +42,27 @@ jobs:
                       break
                   }
               } catch {
-                  # Tunggu sebentar lalu coba lagi
+                  # Abaikan eror jika API belum siap merespons
               }
-              Start-Sleep -Seconds 1
           }
           
           Write-Host "=================================================="
           Write-Host " STATUS: SERVER OPEN.MP WINDOWS ONLINE!"
           Write-Host "=================================================="
-          Write-Host "Salin alamat di bawah ini ke Launcher SAMP kamu & teman-teman:"
           
           if ($ip) {
+              Write-Host "Salin alamat di bawah ini ke Launcher SAMP kamu & teman-teman:"
               Write-Host "👉 $ip"
+              Write-Host "=================================================="
           } else {
-              Write-Host "❌ Gagal mendapatkan IP otomatis di log."
-              Write-Host "Silakan cek di web dashboard.ngrok.com pada menu 'Endpoints'"
+              Write-Host "❌ Ngrok Gagal Konek! Menampilkan log internal untuk debug:"
+              Write-Host "------------------ START LOG ------------------"
+              if (Test-Path "ngrok.log") { Get-Content "ngrok.log" }
+              if (Test-Path "ngrok_err.log") { Get-Content "ngrok_err.log" }
+              Write-Host "------------------- END LOG -------------------"
+              Write-Host "=================================================="
           }
           
-          Write-Host "=================================================="
-          
-          # Menyalakan server utama open.mp versi Windows
+          # Jalankan server utama open.mp
           .\omp-server.exe
         shell: powershell
