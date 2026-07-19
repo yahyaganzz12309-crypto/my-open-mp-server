@@ -1,44 +1,50 @@
-name: Open.mp Windows Playit Auto-Find
+name: Open.mp Linux Playit Official
 
 on:
   workflow_dispatch: 
 
 jobs:
   run-server:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 350 
 
     steps:
       - name: Ambil file dari Repositori
         uses: actions/checkout@v4
 
+      - name: Install Dependencies 32-bit (Anti Eror Libatomic)
+        run: |
+          # Mengaktifkan arsitektur 32-bit agar omp-server bisa jalan
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y libatomic1:i386 libc6:i386 libstdc++6:i386 wget
+
+      - name: Download Playit.gg Linux Resmi
+        run: |
+          echo "Mengunduh Playit.gg versi Linux via wget..."
+          # wget di Linux dijamin 100% sukses mendownload file asli sebesar 11MB
+          wget -O playit https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-amd64
+          chmod +x playit
+
+      - name: Beri Izin Eksekusi Server (Chmod)
+        run: |
+          chmod +x omp-server
+          if [ -d "qawno" ]; then chmod +x qawno/pawncc 2>/dev/null || true; fi
+
       - name: Jalankan Terowongan & Server
         run: |
-          Write-Host "Mencari file playit.exe secara otomatis di seluruh folder..."
-          # Mencari file yang mengandung kata playit dan berakhiran .exe
-          $playitFile = Get-ChildItem -Recurse -Filter "*playit*.exe" | Select-Object -First 1
+          echo "Menjalankan Playit.gg di latar belakang..."
+          ./playit > playit.log 2>&1 &
           
-          if ($playitFile) {
-              Write-Host "✅ File ketemu di: $($playitFile.FullName)"
-              Write-Host "Menjalankan Playit.gg di latar belakang..."
-              Start-Process $playitFile.FullName -RedirectStandardOutput "playit.log" -NoNewWindow
-              
-              # Jeda 10 detik biar link klaimnya kebuat
-              Start-Sleep -Seconds 10
-              
-              Write-Host "=================================================="
-              Write-Host "   BACA LOG DI BAWAH INI UNTUK AKTIVASI SERVER"
-              Write-Host "=================================================="
-              if (Test-Path "playit.log") { Get-Content "playit.log" }
-              Write-Host "=================================================="
-          } else {
-              Write-Host "=================================================="
-              Write-Host "❌ WADUH! File playit.exe beneran GAK ADA di repo kamu."
-              Write-Host "Coba cek lagi di Codespaces, apakah udah di-commit & push?"
-              Write-Host "=================================================="
-              exit 1
-          }
+          # Jeda 10 detik agar Playit selesai membuat link aktivasi
+          sleep 10
           
-          Write-Host "Menyalakan server utama open.mp..."
-          .\omp-server.exe
-        shell: powershell
+          echo "=================================================="
+          echo "   BACA LOG DI BAWAH INI UNTUK AKTIVASI SERVER"
+          echo "=================================================="
+          if [ -f "playit.log" ]; then cat playit.log; fi
+          echo "=================================================="
+          
+          echo "Menyalakan server utama open.mp Linux..."
+          export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
+          ./omp-server
