@@ -1,4 +1,4 @@
-name: Open.mp Linux Public (Ngrok - Fixed)
+name: Open.mp Publik Final
 
 on:
   workflow_dispatch: 
@@ -14,42 +14,34 @@ jobs:
 
       - name: Install Ngrok & Dependencies Linux
         run: |
-          # 1. Tambah repository Ngrok
           curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
           echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-          
-          # 2. Update dan install Ngrok sekaligus libatomic1 (mengatasi libatomic.so.1 missing)
           sudo apt-get update
-          sudo apt-get install -y ngrok libatomic1
+          sudo apt-get install -y ngrok libatomic1 jq
 
       - name: Konfigurasi Ngrok Authtoken
         run: ngrok config add-authtoken ${{ secrets.NGROK_AUTHTOKEN }}
 
       - name: Beri Izin Eksekusi Server (Chmod)
         run: |
-          echo "Mengaktifkan izin jalan untuk omp-server Linux..."
           chmod +x omp-server
           if [ -d "qawno" ]; then chmod +x qawno/pawncc 2>/dev/null || true; fi
 
       - name: Jalankan Terowongan Publik & Server
         run: |
-          echo "Membuka terowongan publik Ngrok (UDP Port 7777)..."
-          # Perbaikan: Hapus flag --log=stdout yang bikin eror, langsung lempar output ke ngrok.log
+          echo "Membuka terowongan publik Ngrok..."
           ngrok udp 7777 > ngrok.log 2>&1 &
           
-          # Tunggu 5 detik agar ngrok stabil
           sleep 5
           
           echo "=================================================="
           echo " STATUS: SERVER OPEN.MP PUBLIK ONLINE!"
           echo "=================================================="
-          echo "Salin alamat di bawah ini ke Launcher SAMP kamu & teman-teman:"
+          echo "Salin alamat di bawah ini ke Launcher SAMP kamu:"
           
-          # Mengambil otomatis IP publik dari Ngrok
           PUBLIC_IP=$(curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url' | sed 's/udp:\/\///')
           echo "👉 $PUBLIC_IP"
           
           echo "=================================================="
           
-          # Menjalankan file omp-server bawaan repo kamu
           ./omp-server
