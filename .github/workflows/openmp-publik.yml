@@ -1,10 +1,10 @@
-name: Open.mp Windows Playit Auto-Find
+name: Open.mp Server + ngrok
 
 on:
   workflow_dispatch:
 
 jobs:
-  run-server:
+  openmp:
     runs-on: windows-latest
     timeout-minutes: 350
 
@@ -12,67 +12,130 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Jalankan Playit & Open.mp
+      - name: Download ngrok
         shell: powershell
         run: |
-          Write-Host "========================================"
-          Write-Host " Mencari playit.exe..."
-          Write-Host "========================================"
+          Write-Host "Downloading ngrok..."
 
-          $playit = Get-ChildItem -Path $PWD -Recurse -Filter "*playit*.exe" | Select-Object -First 1
+          Invoke-WebRequest `
+            -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip" `
+            -OutFile "ngrok.zip"
 
-          if (-not $playit) {
-              Write-Host "❌ playit.exe tidak ditemukan!"
+          Expand-Archive ngrok.zip -DestinationPath .
+
+          .\ngrok.exe version
+
+      - name: Login ngrok
+        shell: powershell
+        env:
+          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:NGROK_AUTHTOKEN)) {
+              Write-Host "NGROK_AUTHTOKEN belum dibuat!"
               exit 1
           }
 
-          Write-Host "✅ playit ditemukan:"
-          Write-Host $playit.FullName
+          .\ngrok.exe config add-authtoken $env:NGROK_AUTHTOKEN
 
-          $playitLog = Join-Path $PWD "playit.log"
-          $playitErr = Join-Path $PWD "playit-error.log"
-
-          Start-Process `
-            -FilePath $playit.FullName `
-            -RedirectStandardOutput $playitLog `
-            -RedirectStandardError $playitErr
-
-          Write-Host "Menunggu Playit membuat link..."
-          Start-Sleep -Seconds 15
-
-          Write-Host ""
-          Write-Host "========== PLAYIT LOG =========="
-
-          if (Test-Path $playitLog) {
-              Get-Content $playitLog
-          } else {
-              Write-Host "playit.log belum dibuat."
-          }
-
-          if (Test-Path $playitErr) {
-              Write-Host ""
-              Write-Host "========== PLAYIT ERROR =========="
-              Get-Content $playitErr
-          }
-
-          Write-Host ""
-          Write-Host "========================================"
-          Write-Host " Mencari omp-server.exe..."
-          Write-Host "========================================"
-
-          $omp = Get-ChildItem -Path $PWD -Recurse -Filter "omp-server.exe" | Select-Object -First 1
+      - name: Cari Open.mp Server
+        shell: powershell
+        run: |
+          $omp = Get-ChildItem -Recurse -Filter "omp-server.exe" | Select-Object -First 1
 
           if (-not $omp) {
-              Write-Host "❌ omp-server.exe tidak ditemukan!"
+              Write-Host "omp-server.exe tidak ditemukan!"
               exit 1
           }
 
-          Write-Host "✅ omp-server ditemukan:"
-          Write-Host $omp.FullName
+          echo "OMP_SERVER=$($omp.FullName)" >> $env:GITHUB_ENV
 
-          Write-Host ""
-          Write-Host "========================================"
-          Write-Host " Menjalankan Open.mp Server"
-          Write-Host "========================================"
+      - name: Jalankan Open.mp
+        shell: powershell
+        run: |
+          Write-Host "Menjalankan Open.mp..."
 
-          & $omp.FullName
+          Start-Process `
+            -FilePath "$env:OMP_SERVER" `
+            -WorkingDirectory (Split-Path "$env:OMP_SERVER")
+
+          Start-Sleep 5
+
+      - name: Jalankan ngrok TCP
+        shell: powershell
+        run: |
+          Write-Host "Menjalankan ngrok..."
+
+          Start-Process `
+            -FilePath ".\ngrok.exe" `
+            -ArgumentList "tcp 7777 --log stdout" `
+            -RedirectStandardOutput "ngrok.log" `
+            -RedirectStandardError "ngrok-error.log"
+
+      - name: Ambil Host dan Port
+        shell: powershell
+        run: |
+          Write-Host "Menunggu tunnel..."
+
+          $success = $false
+
+          for ($i = 1; $i -le 30; $i++) {
+
+              try {
+
+                  $json = Invoke-RestMethod "http://127.0.0.1:4040/api/tunnels"
+
+                  if ($json.tunnels.Count -gt 0) {
+
+                      $url = $json.tunnels[0].public_url
+
+                      if ($url -match "^tcp://(.+):(\d+)$") {
+
+                          $host = $Matches[1]
+                          $port = $Matches[2]
+
+                          Write-Host ""
+                          Write-Host "========================================"
+                          Write-Host "      OPEN.MP SERVER BERHASIL ONLINE"
+                          Write-Host "========================================"
+                          Write-Host ""
+                          Write-Host "Host : $host"
+                          Write-Host "Port : $port"
+                          Write-Host ""
+                          Write-Host "Alamat Server:"
+                          Write-Host "$host`:$port"
+                          Write-Host ""
+                          Write-Host "========================================"
+
+                          $success = $true
+                          break
+                      }
+                  }
+
+              } catch {
+              }
+
+              Start-Sleep 2
+          }
+
+          if (-not $success) {
+
+              Write-Host ""
+              Write-Host "===== NGROK LOG ====="
+
+              if (Test-Path "ngrok.log") {
+                  Get-Content "ngrok.log"
+              }
+
+              if (Test-Path "ngrok-error.log") {
+                  Get-Content "ngrok-error.log"
+              }
+
+              throw "Gagal mendapatkan alamat tunnel."
+          }
+
+      - name: Menjaga Workflow Tetap Hidup
+        shell: powershell
+        run: |
+          while ($true) {
+              Start-Sleep -Seconds 300
+          }
